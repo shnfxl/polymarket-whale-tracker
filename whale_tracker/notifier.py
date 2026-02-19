@@ -35,8 +35,9 @@ class Notifier:
         wallet = str(whale.get("address") or "")
         market_title = market.get("title") or market.get("question") or "Unknown market"
         market_url = activity.get("market_url") or ""
-        side = activity.get("side") or ""
-        side_emoji = "🟢" if side == "YES" else "🔴" if side == "NO" else "⚪"
+        side = str(activity.get("side") or "")
+        side_label = str(activity.get("side_label") or side or "UNKNOWN")
+        side_emoji = "🟢" if side_label == "YES" else "🔴" if side_label == "NO" else "⚪"
         amount = float(activity.get("amount") or 0)
         odds_after = activity.get("odds_after")
         odds_before = activity.get("odds_before")
@@ -53,15 +54,18 @@ class Notifier:
         lines = [
             "🐋 Whale Alert",
             f"🎯 Market: {market_title}",
-            f"{side_emoji} Side: {side}{price_str}",
+            f"{side_emoji} Side: {side_label}{price_str}",
             f"💵 Trade size: ${amount:,.0f}",
             f"🧾 Wallet: {wallet or 'unknown'}",
         ]
         if is_cluster:
             lines.append(f"👥 Cluster wallets (same side): {same_side} ({same_side_other} other)")
             lines.append(f"📦 Cluster notional (lookback): ${same_side_notional:,.0f}")
-        if is_cluster and market_url:
-            lines.append(f"🔗 Market: {market_url}")
+        if is_cluster:
+            if market_url:
+                lines.append(f"🔗 Market: {market_url}")
+            else:
+                lines.append("🔗 Market: unavailable (missing market slug)")
         elif wallet:
             lines.append(f"🔗 Trader: {self._trader_url(wallet)}")
         elif market_url:

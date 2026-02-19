@@ -621,6 +621,7 @@ class PolymarketDataGenerator:
                 },
                 "amount": amount_usd,
                 "side": trade.get("side", "YES"),
+                "side_label": trade.get("side_label", trade.get("side", "YES")),
                 "same_side_whales": same_side_whales,
                 "same_side_other_whales": same_side_other_whales,
                 "same_side_notional": same_side_cluster_notional,

@@ -417,15 +417,19 @@ class PolymarketAPIClient:
                 amount = size
 
             outcome_index = t.get("outcomeIndex")
-            outcome = (t.get("outcome") or "").lower()
+            outcome_raw = str(t.get("outcome") or "").strip()
+            outcome_lower = outcome_raw.lower()
             if outcome_index is not None:
                 side = "YES" if int(outcome_index) == 0 else "NO"
-            elif "yes" in outcome:
+            elif outcome_lower == "yes":
                 side = "YES"
-            elif "no" in outcome:
+            elif outcome_lower == "no":
                 side = "NO"
             else:
                 side = "UNKNOWN"
+            side_label = side
+            if outcome_raw:
+                side_label = outcome_raw if outcome_lower not in ("yes", "no") else outcome_lower.upper()
 
             trades.append({
                 "id": t.get("transactionHash") or f"{t.get('proxyWallet','')}-{ts}",
@@ -435,6 +439,7 @@ class PolymarketAPIClient:
                 "amount": amount,
                 "price": price,
                 "side": side,
+                "side_label": side_label,
                 "timestamp": trade_time,
                 "tx_hash": t.get("transactionHash"),
                 "outcome": t.get("outcome"),
