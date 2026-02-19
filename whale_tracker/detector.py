@@ -72,14 +72,21 @@ class WhaleDetector:
         signals: List[WhaleSignal] = []
         now_ts = int(time.time())
 
+        scanned = 0
+        passed = 0
+        total_trades = 0
+
         for market in markets:
+            scanned += 1
             if not self._market_ok(market):
                 continue
+            passed += 1
             market_id = str(market.get("conditionId") or market.get("id") or "")
             if not market_id:
                 continue
 
             trades = await self.client.get_market_trades(market_id, limit=SETTINGS.trades_per_market)
+            total_trades += len(trades)
             if not trades:
                 continue
 
@@ -123,4 +130,11 @@ class WhaleDetector:
                     )
                 )
 
+        logger.info(
+            "Scan stats: markets=%s passed=%s trades=%s signals=%s",
+            scanned,
+            passed,
+            total_trades,
+            len(signals),
+        )
         return signals
