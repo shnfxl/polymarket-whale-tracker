@@ -25,14 +25,18 @@ class Notifier:
         if self._session and not self._session.closed:
             await self._session.close()
 
+    @staticmethod
+    def _trader_url(wallet: str) -> str:
+        return f"https://polymarket.com/profile/{wallet}"
+
     def _format_message(self, activity: Dict) -> str:
         market = activity.get("market") or {}
         whale = activity.get("whale") or {}
         wallet = str(whale.get("address") or "")
-        wallet_short = f"{wallet[:6]}...{wallet[-4:]}" if wallet else "unknown"
         market_title = market.get("title") or market.get("question") or "Unknown market"
         market_url = activity.get("market_url") or ""
         side = activity.get("side") or ""
+        side_emoji = "🟢" if side == "YES" else "🔴" if side == "NO" else "⚪"
         amount = float(activity.get("amount") or 0)
         odds_after = activity.get("odds_after")
         odds_before = activity.get("odds_before")
@@ -41,19 +45,24 @@ class Notifier:
             price_str = f" @ {float(odds_after):.3f}"
         elif odds_before is not None:
             price_str = f" @ {float(odds_before):.3f}"
-        same_side = activity.get("same_side_whales")
+        same_side = int(activity.get("same_side_whales") or 0)
+        is_cluster = same_side > 1
 
         lines = [
-            "Whale trade detected",
-            f"Market: {market_title}",
-            f"Side: {side}{price_str}",
-            f"Size: ${amount:,.0f}",
-            f"Wallet: {wallet_short}",
+            "🐋 Whale Alert",
+            f"🎯 Market: {market_title}",
+            f"{side_emoji} Side: {side}{price_str}",
+            f"💵 Size: ${amount:,.0f}",
+            f"🧾 Wallet: {wallet or 'unknown'}",
         ]
-        if same_side is not None:
-            lines.append(f"Same-side whales: {same_side}")
-        if market_url:
-            lines.append(f"Link: {market_url}")
+        if same_side:
+            lines.append(f"👥 Same-side whales: {same_side}")
+        if is_cluster and market_url:
+            lines.append(f"🔗 Market: {market_url}")
+        elif wallet:
+            lines.append(f"🔗 Trader: {self._trader_url(wallet)}")
+        elif market_url:
+            lines.append(f"🔗 Market: {market_url}")
         return "\n".join(lines)
 
     async def send_telegram(self, message: str) -> bool:
