@@ -50,6 +50,18 @@ Run:
 python -m whale_tracker
 ```
 
+Test one scan without sending alerts:
+
+```bash
+python -m whale_tracker --once --dry-run
+```
+
+Disable gates for debugging:
+
+```bash
+python -m whale_tracker --disable-market-gates --disable-wallet-gate
+```
+
 ## Output
 Alerts include:
 - market title + link

@@ -398,8 +398,10 @@ class PolymarketDataGenerator:
                     "volume24h": 0
                 }
 
+            market_gates_enabled = not self.settings.DISABLE_MARKET_GATES
+
             # Gate 0: Short-duration market filter (5-min binaries, etc)
-            if self._is_short_duration_market(market):
+            if market_gates_enabled and self._is_short_duration_market(market):
                 if self.settings.DEBUG_LOG_API:
                     hours = self._market_hours_remaining(market)
                     print(f"DEBUG: short duration filtered market={market_condition_id} hours={hours:.1f}")
@@ -429,7 +431,7 @@ class PolymarketDataGenerator:
 
             # Apply sports multiplier - sports markets have more retail noise
             effective_threshold = self._get_effective_whale_threshold(market, adaptive_abs_threshold)
-            if is_sports and amount_usd < effective_threshold:
+            if market_gates_enabled and is_sports and amount_usd < effective_threshold:
                 if self.settings.DEBUG_LOG_API:
                     print(f"DEBUG: sports threshold filtered amount={amount_usd:.0f} < threshold={effective_threshold:.0f}")
                 self._count_gate("reject_sports_threshold")
@@ -441,53 +443,62 @@ class PolymarketDataGenerator:
             liquidity_known = liquidity > 0
             volume_known = volume_24h > 0
 
-            if liquidity_known and liquidity < self.settings.HARD_MIN_LIQUIDITY_USD:
-                self._count_gate("reject_market_liquidity")
-                continue
-            if volume_known and volume_24h < self.settings.HARD_MIN_VOLUME_24H_USD:
-                self._count_gate("reject_market_volume")
-                continue
-            meets_abs = amount_usd >= adaptive_abs_threshold
-            meets_rel_vol = volume_known and amount_usd >= (volume_24h * self.settings.REL_WHALE_VOLUME_PCT)
-            meets_rel_liq = liquidity_known and amount_usd >= (liquidity * self.settings.REL_WHALE_LIQUIDITY_PCT)
-            meets_basic = meets_abs or meets_rel_vol or meets_rel_liq
+            if market_gates_enabled:
+                if liquidity_known and liquidity < self.settings.HARD_MIN_LIQUIDITY_USD:
+                    self._count_gate("reject_market_liquidity")
+                    continue
+                if volume_known and volume_24h < self.settings.HARD_MIN_VOLUME_24H_USD:
+                    self._count_gate("reject_market_volume")
+                    continue
+                meets_abs = amount_usd >= adaptive_abs_threshold
+                meets_rel_vol = volume_known and amount_usd >= (volume_24h * self.settings.REL_WHALE_VOLUME_PCT)
+                meets_rel_liq = liquidity_known and amount_usd >= (liquidity * self.settings.REL_WHALE_LIQUIDITY_PCT)
+                meets_basic = meets_abs or meets_rel_vol or meets_rel_liq
 
-            low_liquidity = liquidity_known and liquidity < self.settings.MIN_LIQUIDITY_USD
-            low_volume = volume_known and volume_24h < self.settings.MIN_MARKET_VOLUME_24H
-            if (low_liquidity or low_volume):
-                # Allow only if trade is exceptionally large relative to market
-                meets_low_liq_override = (
-                    (liquidity_known and amount_usd >= liquidity * self.settings.LOW_LIQUIDITY_WHALE_LIQ_PCT) or
-                    (volume_known and amount_usd >= volume_24h * self.settings.LOW_LIQUIDITY_WHALE_VOL_PCT) or
-                    (amount_usd >= adaptive_abs_threshold * 2)
-                )
-                if not meets_low_liq_override:
+                low_liquidity = liquidity_known and liquidity < self.settings.MIN_LIQUIDITY_USD
+                low_volume = volume_known and volume_24h < self.settings.MIN_MARKET_VOLUME_24H
+                if (low_liquidity or low_volume):
+                    # Allow only if trade is exceptionally large relative to market
+                    meets_low_liq_override = (
+                        (liquidity_known and amount_usd >= liquidity * self.settings.LOW_LIQUIDITY_WHALE_LIQ_PCT) or
+                        (volume_known and amount_usd >= volume_24h * self.settings.LOW_LIQUIDITY_WHALE_VOL_PCT) or
+                        (amount_usd >= adaptive_abs_threshold * 2)
+                    )
+                    if not meets_low_liq_override:
+                        self._count_gate("reject_relative_size")
+                        continue
+
+                if not meets_basic:
                     self._count_gate("reject_relative_size")
                     continue
+                market_target_score = self._market_target_score(
+                    market=market,
+                    trade_count=market_trade_counts.get(market_condition_id, 0),
+                    unique_wallets=len(market_unique_wallets.get(market_condition_id, set())),
+                    large_trade_count=market_large_trade_counts.get(market_condition_id, 0),
+                )
+                if market_target_score < self.settings.MIN_MARKET_TARGET_SCORE and amount_usd < (adaptive_abs_threshold * self.settings.MARKET_TARGET_OVERRIDE_MULTIPLIER):
+                    self._count_gate("reject_market_target")
+                    self._count_gate("reject_not_popular")
+                    continue
 
-            if not meets_basic:
-                self._count_gate("reject_relative_size")
-                continue
-            market_target_score = self._market_target_score(
-                market=market,
-                trade_count=market_trade_counts.get(market_condition_id, 0),
-                unique_wallets=len(market_unique_wallets.get(market_condition_id, set())),
-                large_trade_count=market_large_trade_counts.get(market_condition_id, 0),
-            )
-            if market_target_score < self.settings.MIN_MARKET_TARGET_SCORE and amount_usd < (adaptive_abs_threshold * self.settings.MARKET_TARGET_OVERRIDE_MULTIPLIER):
-                self._count_gate("reject_market_target")
-                self._count_gate("reject_not_popular")
-                continue
-
-            market_quality = await self._get_market_quality(market_condition_id)
-            if not self._passes_market_quality(market_quality):
-                if self.settings.DEBUG_LOG_API:
-                    print(
-                        "DEBUG: market quality filtered "
-                        f"{market_condition_id} stats={market_quality}"
-                    )
-                self._count_gate("reject_market_quality")
-                continue
+                market_quality = await self._get_market_quality(market_condition_id)
+                if not self._passes_market_quality(market_quality):
+                    if self.settings.DEBUG_LOG_API:
+                        print(
+                            "DEBUG: market quality filtered "
+                            f"{market_condition_id} stats={market_quality}"
+                        )
+                    self._count_gate("reject_market_quality")
+                    continue
+            else:
+                market_target_score = self._market_target_score(
+                    market=market,
+                    trade_count=market_trade_counts.get(market_condition_id, 0),
+                    unique_wallets=len(market_unique_wallets.get(market_condition_id, set())),
+                    large_trade_count=market_large_trade_counts.get(market_condition_id, 0),
+                )
+                market_quality = None
 
             # Get trader stats
             trader_address = trade.get("user", "")
@@ -507,7 +518,7 @@ class PolymarketDataGenerator:
             token_id = self.api_client._extract_token_id(market, trade.get("side", "YES"))
             odds_after = self.api_client._orderbook_mid(token_id) or odds_before
             reference_price = odds_after if odds_after is not None else odds_before
-            if self._in_tail_price_band(reference_price):
+            if market_gates_enabled and self._in_tail_price_band(reference_price):
                 if self.settings.DEBUG_LOG_API:
                     print(
                         "DEBUG: tail price filtered "
@@ -517,10 +528,13 @@ class PolymarketDataGenerator:
                 continue
 
             same_side_whales = len(same_side_clusters.get((market_condition_id, trade.get("side", "YES")), set()))
+            if self.settings.DISABLE_CLUSTER_GATE:
+                same_side_whales = 0
             # Gate 2: Wallet quality
-            if wallet_tier == "retail" and float(trader_stats.get("credibility", 0) or 0) < 4 and same_side_whales < 3:
-                self._count_gate("reject_wallet_quality")
-                continue
+            if not self.settings.DISABLE_WALLET_GATE:
+                if wallet_tier == "retail" and float(trader_stats.get("credibility", 0) or 0) < 4 and same_side_whales < 3:
+                    self._count_gate("reject_wallet_quality")
+                    continue
 
             odds_move_1h = None
             odds_move_24h = None
@@ -543,11 +557,12 @@ class PolymarketDataGenerator:
             flow_signal = (
                 abs(float(net_change or 0)) >= self.settings.FLOW_GATE_NET_POSITION_USD or
                 abs(float(flow_1h.get("net_inflow") or 0)) >= self.settings.FLOW_GATE_MARKET_INFLOW_USD or
-                same_side_whales >= self.settings.FLOW_GATE_CLUSTER_MIN
+                (same_side_whales >= self.settings.FLOW_GATE_CLUSTER_MIN if not self.settings.DISABLE_CLUSTER_GATE else False)
             )
-            if not flow_signal and not (self.settings.ALLOW_SPARSE_FLOW_BYPASS and sparse_flow and amount_usd >= adaptive_abs_threshold):
-                self._count_gate("reject_flow_quality")
-                continue
+            if not self.settings.DISABLE_TREND_GATE:
+                if not flow_signal and not (self.settings.ALLOW_SPARSE_FLOW_BYPASS and sparse_flow and amount_usd >= adaptive_abs_threshold):
+                    self._count_gate("reject_flow_quality")
+                    continue
 
             # Gate 4: Impact quality
             odds_impact = abs(float(odds_after or 0) - float(odds_before or 0))
@@ -555,9 +570,10 @@ class PolymarketDataGenerator:
                 odds_impact >= self.settings.IMPACT_GATE_MIN_ABS or
                 (odds_move_pct_1h is not None and abs(float(odds_move_pct_1h)) >= self.settings.IMPACT_GATE_MIN_PCT)
             )
-            if not impact_signal and not (self.settings.ALLOW_SPARSE_FLOW_BYPASS and sparse_flow and same_side_whales >= self.settings.FLOW_GATE_CLUSTER_MIN):
-                self._count_gate("reject_impact_quality")
-                continue
+            if not self.settings.DISABLE_IMPACT_GATE:
+                if not impact_signal and not (self.settings.ALLOW_SPARSE_FLOW_BYPASS and sparse_flow and same_side_whales >= self.settings.FLOW_GATE_CLUSTER_MIN):
+                    self._count_gate("reject_impact_quality")
+                    continue
             self.processed_trades.add(trade_id)
             if len(self.processed_trades) > self.settings.PROCESSED_TRADES_MAX:
                 # Trim to most recent trades (by timestamp if available, else arbitrary)

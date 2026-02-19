@@ -12,8 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 class Notifier:
-    def __init__(self):
+    def __init__(self, dry_run: bool = False):
         self._session: Optional[aiohttp.ClientSession] = None
+        self.dry_run = dry_run
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if not self._session or self._session.closed:
@@ -94,6 +95,9 @@ class Notifier:
 
     async def notify(self, activity: Dict):
         msg = self._format_message(activity)
+        if self.dry_run:
+            logger.info("Dry run alert:\n%s", msg)
+            return
         await self.send_telegram(msg)
         if SETTINGS.X_POST_ENABLED:
             await self.send_x(msg)

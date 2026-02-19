@@ -11,9 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 class WhaleDetector:
-    def __init__(self, api_client: Optional[PolymarketAPIClient] = None):
-        self.api_client = api_client or PolymarketAPIClient()
-        self.data_generator = PolymarketDataGenerator(self.api_client)
+    def __init__(self, api_client: Optional[PolymarketAPIClient] = None, settings=None):
+        self.settings = settings or SETTINGS
+        self.api_client = api_client or PolymarketAPIClient(settings=self.settings)
+        self.data_generator = PolymarketDataGenerator(self.api_client, settings=self.settings)
 
     async def close(self):
         if self.api_client:
