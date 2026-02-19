@@ -6,19 +6,31 @@ from typing import Dict, List, Optional
 from .api_client import PolymarketAPIClient
 from .config import SETTINGS
 from .data_generator import PolymarketDataGenerator
+from .state_store import StateStore
 
 logger = logging.getLogger(__name__)
 
 
 class WhaleDetector:
-    def __init__(self, api_client: Optional[PolymarketAPIClient] = None, settings=None):
+    def __init__(
+        self,
+        api_client: Optional[PolymarketAPIClient] = None,
+        settings=None,
+        state_store: Optional[StateStore] = None,
+    ):
         self.settings = settings or SETTINGS
         self.api_client = api_client or PolymarketAPIClient(settings=self.settings)
-        self.data_generator = PolymarketDataGenerator(self.api_client, settings=self.settings)
+        self.data_generator = PolymarketDataGenerator(
+            self.api_client,
+            settings=self.settings,
+            state_store=state_store,
+        )
 
     async def close(self):
         if self.api_client:
             await self.api_client.__aexit__(None, None, None)
+        if getattr(self.data_generator, "state_store", None):
+            self.data_generator.state_store.close()
 
     async def scan(self) -> List[Dict]:
         # refresh market cache each cycle (keeps quality gates accurate)

@@ -64,6 +64,7 @@ python3 -m unittest discover -s tests -v
 - `MIN_MARKET_VOLUME_24H`: 24h volume floor used by filters
 - `MARKET_CATEGORIES`: optional comma-separated scope (`crypto,stocks,...`)
 - `DISABLE_*_GATE`: selectively disable filtering gates for debugging
+- `BOT_STATE_FILE`: JSON state file for persistent dedupe/cooldown memory (default: `memory/polymarket_state.json`)
 
 Compatibility aliases still accepted:
 - `MIN_WHALE_USD` -> `MIN_WHALE_BET_USD`
@@ -85,6 +86,7 @@ Each Telegram alert includes:
 
 ## Notes
 - `.env` is loaded automatically at startup.
+- Persistent dedupe state is stored in a local JSON file so restarts are replay-safe without extra dependencies.
 - This project is alerting infrastructure; validate thresholds on paper trading data before acting on signals.
 - Contributor onboarding docs: `CONTRIBUTING.md`, `MEMORY.md`.
 - CI workflow: `.github/workflows/ci.yml`.

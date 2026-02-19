@@ -25,9 +25,10 @@ class FakeAPIClient:
 
 
 class FakeDataGenerator:
-    def __init__(self, api_client, settings=None):
+    def __init__(self, api_client, settings=None, state_store=None):
         self.api_client = api_client
         self.settings = settings
+        self.state_store = state_store
         self.started = False
 
     def start_cycle(self):

@@ -12,6 +12,7 @@ load_dotenv()
 from .detector import WhaleDetector
 from .notifier import Notifier
 from .config import SETTINGS
+from .state_store import JsonFileStateStore
 
 
 async def run_loop(args):
@@ -42,7 +43,8 @@ async def run_loop(args):
         await notifier.close()
         return
 
-    detector = WhaleDetector(settings=settings)
+    state_store = JsonFileStateStore(settings.STATE_FILE)
+    detector = WhaleDetector(settings=settings, state_store=state_store)
 
     try:
         while True:

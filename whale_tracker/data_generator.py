@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Tuple
 
 from .config import SETTINGS, Settings, utc_now
 from .api_client import PolymarketAPIClient
+from .state_store import InMemoryStateStore, StateStore
 
 logger = logging.getLogger(__name__)
 
@@ -13,12 +14,16 @@ logger = logging.getLogger(__name__)
 class PolymarketDataGenerator:
     """Generates activity data from real Polymarket API"""
 
-    def __init__(self, api_client: PolymarketAPIClient, settings: Optional[Settings] = None):
+    def __init__(
+        self,
+        api_client: PolymarketAPIClient,
+        settings: Optional[Settings] = None,
+        state_store: Optional[StateStore] = None,
+    ):
         self.api_client = api_client
         self.settings = settings or SETTINGS
         self.last_check_time: Dict[str, datetime] = {}
-        self.processed_trades: set = set()  # Track processed trade IDs
-        self._processed_trade_order: List[str] = []
+        self.state_store = state_store or InMemoryStateStore()
         self.market_quality_cache: Dict[str, Tuple[datetime, Dict]] = {}
         self.api_semaphore = asyncio.Semaphore(max(1, self.settings.API_CONCURRENCY_LIMIT))
         self._cycle_trader_stats_cache: Dict[str, Dict] = {}
@@ -110,19 +115,6 @@ class PolymarketDataGenerator:
 
     def snapshot_gate_counters(self) -> Dict[str, int]:
         return dict(self.gate_counters)
-
-    def _remember_processed_trade(self, trade_id: str):
-        if not trade_id or trade_id in self.processed_trades:
-            return
-        self.processed_trades.add(trade_id)
-        self._processed_trade_order.append(trade_id)
-        trim_target = max(1, int(self.settings.PROCESSED_TRADES_TRIM_TO))
-        max_size = max(trim_target, int(self.settings.PROCESSED_TRADES_MAX))
-        if len(self._processed_trade_order) <= max_size:
-            return
-        while len(self._processed_trade_order) > trim_target:
-            old_id = self._processed_trade_order.pop(0)
-            self.processed_trades.discard(old_id)
 
     def _is_popular_category(self, market: Dict) -> bool:
         """Filter markets to popular categories via keyword match."""
@@ -385,7 +377,7 @@ class PolymarketDataGenerator:
         candidates: List[Dict] = []
         for trade in sorted(trades, key=lambda t: float(t.get("amount", 0) or 0), reverse=True)[:max(1, self.settings.MAX_WHALE_ENRICH_TRADES)]:
             trade_id = trade.get("id", "")
-            if trade_id in self.processed_trades:
+            if self.state_store.is_processed_trade(trade_id):
                 self._count_gate("reject_duplicate")
                 continue
 
@@ -606,7 +598,11 @@ class PolymarketDataGenerator:
                 if not impact_signal and not (self.settings.ALLOW_SPARSE_FLOW_BYPASS and sparse_flow and same_side_whales >= self.settings.FLOW_GATE_CLUSTER_MIN):
                     self._count_gate("reject_impact_quality")
                     continue
-            self._remember_processed_trade(trade_id)
+            self.state_store.remember_processed_trade(
+                trade_id,
+                max_size=self.settings.PROCESSED_TRADES_MAX,
+                trim_to=self.settings.PROCESSED_TRADES_TRIM_TO,
+            )
 
             candidates.append({
                 "type": "whale_bet",
