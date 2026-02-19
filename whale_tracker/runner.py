@@ -14,7 +14,11 @@ async def run_loop():
     load_dotenv()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    logging.info("Whale tracker starting (poll=%ss, min_whale=$%s)", SETTINGS.poll_interval_seconds, int(SETTINGS.min_whale_usd))
+    logging.info(
+        "Whale tracker starting (poll=%ss, min_whale=$%s)",
+        SETTINGS.POLL_INTERVAL_SECONDS,
+        int(SETTINGS.MIN_WHALE_BET_USD),
+    )
 
     detector = WhaleDetector()
     notifier = Notifier()
@@ -25,7 +29,7 @@ async def run_loop():
             logging.info("Scan complete: %s signals", len(signals))
             for sig in signals:
                 await notifier.notify(sig)
-            await asyncio.sleep(SETTINGS.poll_interval_seconds)
+            await asyncio.sleep(SETTINGS.POLL_INTERVAL_SECONDS)
     finally:
         await detector.close()
         await notifier.close()
