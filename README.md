@@ -56,6 +56,12 @@ Test one scan without sending alerts:
 python -m whale_tracker --once --dry-run
 ```
 
+Limit to specific categories:
+
+```bash
+export MARKET_CATEGORIES=crypto,stocks
+```
+
 Disable gates for debugging:
 
 ```bash

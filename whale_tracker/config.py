@@ -232,6 +232,12 @@ CATEGORY_KEYWORDS = {
     "politics": ["election", "president", "senate", "house", "congress", "governor", "parliament", "prime minister", "referendum", "vote", "campaign", "poll", "approval"]
 }
 
+MARKET_CATEGORIES = [
+    c.strip().lower()
+    for c in (os.getenv("MARKET_CATEGORIES", "") or "").split(",")
+    if c.strip()
+]
+
 
 class Settings:
     """

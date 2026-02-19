@@ -128,6 +128,8 @@ class PolymarketDataGenerator:
 
     def _market_in_scope(self, market: Dict) -> bool:
         """Toggleable category gate for smart-money/volume pipelines."""
+        if self.settings.MARKET_CATEGORIES:
+            return self._market_category(market) in self.settings.MARKET_CATEGORIES
         if not self.settings.REQUIRE_POPULAR_CATEGORY:
             return True
         return self._is_popular_category(market) or self._is_high_signal_market(market)
