@@ -337,6 +337,7 @@ class PolymarketDataGenerator:
             return []
 
         same_side_clusters: Dict[Tuple[str, str], set] = {}
+        same_side_notional: Dict[Tuple[str, str], float] = {}
         market_trade_counts: Dict[str, int] = {}
         market_unique_wallets: Dict[str, set] = {}
         market_large_trade_counts: Dict[str, int] = {}
@@ -349,7 +350,9 @@ class PolymarketDataGenerator:
             amount = float(t.get("amount", 0) or 0)
             if not m_id or side not in ("YES", "NO") or not user:
                 continue
-            same_side_clusters.setdefault((m_id, side), set()).add(user)
+            cluster_key = (m_id, side)
+            same_side_clusters.setdefault(cluster_key, set()).add(user)
+            same_side_notional[cluster_key] = same_side_notional.get(cluster_key, 0.0) + amount
             market_trade_counts[m_id] = market_trade_counts.get(m_id, 0) + 1
             market_unique_wallets.setdefault(m_id, set()).add(user)
             if amount >= self.settings.MIN_WHALE_BET_USD:
@@ -529,9 +532,14 @@ class PolymarketDataGenerator:
                 self._count_gate("reject_tail_price")
                 continue
 
-            same_side_whales = len(same_side_clusters.get((market_condition_id, trade.get("side", "YES")), set()))
+            cluster_key = (market_condition_id, trade.get("side", "YES"))
+            same_side_whales = len(same_side_clusters.get(cluster_key, set()))
+            same_side_cluster_notional = float(same_side_notional.get(cluster_key, 0.0))
+            same_side_other_whales = max(0, same_side_whales - 1)
             if self.settings.DISABLE_CLUSTER_GATE:
                 same_side_whales = 0
+                same_side_cluster_notional = amount_usd
+                same_side_other_whales = 0
             # Gate 2: Wallet quality
             if not self.settings.DISABLE_WALLET_GATE:
                 if wallet_tier == "retail" and float(trader_stats.get("credibility", 0) or 0) < 4 and same_side_whales < 3:
@@ -599,6 +607,8 @@ class PolymarketDataGenerator:
                 "amount": amount_usd,
                 "side": trade.get("side", "YES"),
                 "same_side_whales": same_side_whales,
+                "same_side_other_whales": same_side_other_whales,
+                "same_side_notional": same_side_cluster_notional,
                 "is_new_trader": trader_stats.get("trade_count", 0) <= 3,
                 "is_sports_market": is_sports,
                 "market_category": market_category,

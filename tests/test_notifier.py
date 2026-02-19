@@ -18,6 +18,8 @@ class NotifierTests(unittest.IsolatedAsyncioTestCase):
             "amount": 25000,
             "odds_after": 0.734,
             "same_side_whales": 2,
+            "same_side_other_whales": 1,
+            "same_side_notional": 47000,
         }
 
         msg = notifier._format_message(activity)
@@ -25,9 +27,10 @@ class NotifierTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("🐋 Whale Alert", msg)
         self.assertIn("🎯 Market: Will BTC exceed $100k?", msg)
         self.assertIn("🟢 Side: YES @ 0.734", msg)
-        self.assertIn("💵 Size: $25,000", msg)
+        self.assertIn("💵 Trade size: $25,000", msg)
         self.assertIn("🧾 Wallet: 0x1234567890abcdef1234567890abcdef12345678", msg)
-        self.assertIn("👥 Same-side whales: 2", msg)
+        self.assertIn("👥 Cluster wallets (same side): 2 (1 other)", msg)
+        self.assertIn("📦 Cluster notional (lookback): $47,000", msg)
         self.assertIn("🔗 Market: https://polymarket.com/market/btc-100k", msg)
         self.assertNotIn("🔗 Trader:", msg)
 

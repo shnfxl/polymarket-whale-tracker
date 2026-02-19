@@ -46,17 +46,20 @@ class Notifier:
         elif odds_before is not None:
             price_str = f" @ {float(odds_before):.3f}"
         same_side = int(activity.get("same_side_whales") or 0)
-        is_cluster = same_side > 1
+        same_side_other = int(activity.get("same_side_other_whales") or max(0, same_side - 1))
+        same_side_notional = float(activity.get("same_side_notional") or amount)
+        is_cluster = same_side_other > 0
 
         lines = [
             "🐋 Whale Alert",
             f"🎯 Market: {market_title}",
             f"{side_emoji} Side: {side}{price_str}",
-            f"💵 Size: ${amount:,.0f}",
+            f"💵 Trade size: ${amount:,.0f}",
             f"🧾 Wallet: {wallet or 'unknown'}",
         ]
-        if same_side:
-            lines.append(f"👥 Same-side whales: {same_side}")
+        if is_cluster:
+            lines.append(f"👥 Cluster wallets (same side): {same_side} ({same_side_other} other)")
+            lines.append(f"📦 Cluster notional (lookback): ${same_side_notional:,.0f}")
         if is_cluster and market_url:
             lines.append(f"🔗 Market: {market_url}")
         elif wallet:
