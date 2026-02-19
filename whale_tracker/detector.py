@@ -25,12 +25,12 @@ class WhaleDetector:
         if self.api_client and not self.api_client.session:
             await self.api_client.__aenter__()
         await self.api_client.fetch_markets(
-            limit=SETTINGS.MARKET_LIMIT,
+            limit=self.settings.MARKET_LIMIT,
             active=True,
-            sort_by=SETTINGS.MARKET_SORT_BY,
+            sort_by=self.settings.MARKET_SORT_BY,
         )
         self.data_generator.start_cycle()
-        whale_bets = await self.data_generator.generate_whale_bets(limit=SETTINGS.MAX_CANDIDATES_PER_TYPE)
+        whale_bets = await self.data_generator.generate_whale_bets(limit=self.settings.MAX_CANDIDATES_PER_TYPE)
         gates = self.data_generator.snapshot_gate_counters()
         logger.info("Whale scan: candidates=%s gates=%s", len(whale_bets), gates)
         return whale_bets

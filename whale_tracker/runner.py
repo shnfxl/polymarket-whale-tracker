@@ -7,6 +7,8 @@ import argparse
 from pathlib import Path
 from dotenv import load_dotenv
 
+load_dotenv()
+
 from .detector import WhaleDetector
 from .notifier import Notifier
 from .config import SETTINGS
@@ -30,9 +32,17 @@ async def run_loop(args):
         settings.POLL_INTERVAL_SECONDS,
         int(settings.MIN_WHALE_BET_USD),
     )
+    if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
+        logging.warning("Telegram credentials are missing; alerts will not be sent.")
+
+    notifier = Notifier(dry_run=args.dry_run, settings=settings)
+    if args.test_telegram:
+        ok = await notifier.send_telegram(args.test_message)
+        logging.info("Telegram test result: %s", "success" if ok else "failed")
+        await notifier.close()
+        return
 
     detector = WhaleDetector(settings=settings)
-    notifier = Notifier(dry_run=args.dry_run)
 
     try:
         while True:
@@ -52,6 +62,12 @@ def main():
     parser = argparse.ArgumentParser(description="Polymarket whale tracker")
     parser.add_argument("--once", action="store_true", help="Run one scan and exit")
     parser.add_argument("--dry-run", action="store_true", help="Do not send alerts")
+    parser.add_argument("--test-telegram", action="store_true", help="Send a Telegram test message and exit")
+    parser.add_argument(
+        "--test-message",
+        default="Polymarket whale tracker test message",
+        help="Message text used with --test-telegram",
+    )
     parser.add_argument("--disable-market-gates", action="store_true")
     parser.add_argument("--disable-cluster-gate", action="store_true")
     parser.add_argument("--disable-wallet-gate", action="store_true")

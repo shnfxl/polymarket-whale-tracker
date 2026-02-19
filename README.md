@@ -1,85 +1,90 @@
 # Polymarket Whale Tracker
 
-A focused, open-source tracker that watches Polymarket markets for large whale trades and sends alerts to Telegram or X.
+Open-source bot that scans Polymarket for large trades and sends Telegram alerts.
 
-## Features
-- Detects large trades ("whale" threshold) from Polymarket data
-- Simple, readable codebase
-- Optional wallet allowlist/blocklist
-- Alerts to Telegram and/or X
+## What It Does
+- Polls Polymarket markets + recent trades
+- Detects whale-sized bets with market-quality gates
+- Enriches alerts with wallet/trade context
+- Sends formatted alerts to Telegram
 
-## Quick start
+## What It Does Not Do
+- No trading or order placement
+- No X/Twitter posting
 
+## Requirements
+- Python 3.10+
+- A Telegram bot token and destination chat ID
+
+## Setup
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env
 ```
 
-Create a `.env` (optional) or export env vars:
+Populate `.env` with at least:
+```env
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_CHAT_ID=...
+```
 
+## Run
+Start the loop:
 ```bash
-# Polymarket APIs (public, no key required)
-export POLY_GAMMA_API=https://gamma-api.polymarket.com
-export POLY_DATA_API=https://data-api.polymarket.com
-
-# Alerting
-export TELEGRAM_BOT_TOKEN=...
-export TELEGRAM_CHAT_ID=...
-# X posting (optional)
-export X_POST_ENABLED=false
-export X_CONSUMER_KEY=...
-export X_CONSUMER_SECRET=...
-export X_ACCESS_TOKEN=...
-export X_ACCESS_TOKEN_SECRET=...
-
-# Whale detection tuning
-export MIN_WHALE_USD=20000
-export MIN_LIQUIDITY_USD=10000
-export MIN_MARKET_VOLUME_24H=25000
-export POLL_INTERVAL_SECONDS=60
-
-# Optional wallet filters
-export WALLET_ALLOWLIST=0xabc...,0xdef...
-export WALLET_BLOCKLIST=0x123...
+python3 -m whale_tracker
 ```
 
-Run:
-
+Single scan, no outbound alerts:
 ```bash
-python -m whale_tracker
+python3 -m whale_tracker --once --dry-run
 ```
 
-Test one scan without sending alerts:
-
+Send a Telegram test message and exit:
 ```bash
-python -m whale_tracker --once --dry-run
+python3 -m whale_tracker --test-telegram --test-message "hello from whale tracker"
 ```
 
-Limit to specific categories:
-
+Debug gate tuning:
 ```bash
-export MARKET_CATEGORIES=crypto,stocks
+python3 -m whale_tracker --disable-market-gates --disable-wallet-gate
 ```
 
-Disable gates for debugging:
-
+## Tests
+Run the unit suite:
 ```bash
-python -m whale_tracker --disable-market-gates --disable-wallet-gate
+python3 -m unittest discover -s tests -v
 ```
 
-## Output
-Alerts include:
-- market title + link
-- side and price
-- size in USD
-- wallet address (short)
-- same-side whale count (basic cluster signal)
+## Key Config
+- `POLL_INTERVAL_SECONDS`: scan frequency
+- `MIN_WHALE_BET_USD`: absolute whale threshold
+- `MIN_LIQUIDITY_USD`: market liquidity floor used by filters
+- `MIN_MARKET_VOLUME_24H`: 24h volume floor used by filters
+- `MARKET_CATEGORIES`: optional comma-separated scope (`crypto,stocks,...`)
+- `DISABLE_*_GATE`: selectively disable filtering gates for debugging
+
+Compatibility aliases still accepted:
+- `MIN_WHALE_USD` -> `MIN_WHALE_BET_USD`
+- `POLY_GAMMA_API` -> `POLYMARKET_GAMMA_API`
+- `POLY_DATA_API` -> `POLYMARKET_DATA_API`
+
+## Alert Shape
+Each Telegram alert includes:
+- market title
+- side + price
+- USD size
+- shortened wallet
+- same-side whale count (cluster signal)
+- market link (when available)
 
 ## Notes
-This project only tracks and alerts. It does **not** place trades.
-
-X posting uses Tweepy (OAuth1). If you don’t want X support, leave `X_POST_ENABLED=false`.
+- `.env` is loaded automatically at startup.
+- This project is alerting infrastructure; validate thresholds on paper trading data before acting on signals.
+- Contributor onboarding docs: `CONTRIBUTING.md`, `MEMORY.md`.
+- CI workflow: `.github/workflows/ci.yml`.
+- Security policy: `SECURITY.md`.
 
 ## License
 MIT

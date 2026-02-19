@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""
-Semi-Automated Polymarket Whale Tracker
-Generates engaging tweet drafts and sends to Telegram for review
-Uses real Polymarket API data to track whale bets, smart money, and volume spikes
-"""
+"""Runtime settings for the Polymarket whale tracker."""
 
 from pathlib import Path
 import random
@@ -18,17 +14,19 @@ import asyncio
 import aiohttp
 import argparse
 
-try:
-    import tweepy
-except ImportError:
-    tweepy = None
-
-
 # Get API keys - only private key needed per Polymarket docs
 POLYMARKET_PRIVATE_KEY = (os.getenv('POLYMARKET_PRIVATE_KEY') or '').strip()
 POLYMARKET_FUNDER_ADDRESS = os.getenv('POLYMARKET_FUNDER_ADDRESS') or os.getenv('FUNDER_ADDRESS')
-TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID', '@npc0054')  # Default to @npc0054
+TELEGRAM_BOT_TOKEN = (
+    os.getenv("TELEGRAM_BOT_TOKEN")
+    or os.getenv("TELEGRAM_TOKEN")
+    or os.getenv("TG_BOT_TOKEN")
+)
+TELEGRAM_CHAT_ID = (
+    os.getenv("TELEGRAM_CHAT_ID")
+    or os.getenv("TELEGRAM_CHANNEL_ID")
+    or os.getenv("TELEGRAM_CHAT")
+)
 TELEGRAM_CONTEXT_MODE = (os.getenv("TELEGRAM_CONTEXT_MODE", "off") or "off").strip().lower()
 BRAND_NAME = (os.getenv("BRAND_NAME", "PolyTheWhale") or "PolyTheWhale").strip()
 LOG_FORMAT = (os.getenv("LOG_FORMAT", "text") or "text").strip().lower()
@@ -103,17 +101,10 @@ PROCESSED_TRADES_MAX = int(os.getenv("PROCESSED_TRADES_MAX", "10000"))
 PROCESSED_TRADES_TRIM_TO = int(os.getenv("PROCESSED_TRADES_TRIM_TO", "5000"))
 SIGNAL_GATES_LOG_FILE = Path(os.getenv("SIGNAL_GATES_LOG_FILE", "logs/signal_quality_gates.jsonl"))
 STATE_FILE = Path(os.getenv("BOT_STATE_FILE", "memory/polymarket_semi_auto_state.json"))
-X_POST_ENABLED = os.getenv("X_POST_ENABLED", "").lower() in ("1", "true", "yes")
 MANUAL_REVIEW_ONLY = os.getenv("MANUAL_REVIEW_ONLY", "true").lower() in ("1", "true", "yes")
-X_HIGH_VALUE_SCORE_MIN = float(os.getenv("X_HIGH_VALUE_SCORE_MIN", "8.0"))
-X_MAX_POSTS_PER_DAY = int(os.getenv("X_MAX_POSTS_PER_DAY", "3"))
 MAX_CANDIDATES_PER_TYPE = int(os.getenv("MAX_CANDIDATES_PER_TYPE", "5"))
 MAX_DRAFTS_PER_CYCLE = int(os.getenv("MAX_DRAFTS_PER_CYCLE", "4"))
 MAX_ALERTS_PER_DAY = int(os.getenv("MAX_ALERTS_PER_DAY", "12"))
-X_CONSUMER_KEY = os.getenv("X_CONSUMER_KEY") or os.getenv("TWITTER_API_KEY")
-X_CONSUMER_SECRET = os.getenv("X_CONSUMER_SECRET") or os.getenv("TWITTER_API_SECRET")
-X_ACCESS_TOKEN = os.getenv("X_ACCESS_TOKEN") or os.getenv("TWITTER_ACCESS_TOKEN")
-X_ACCESS_TOKEN_SECRET = os.getenv("X_ACCESS_TOKEN_SECRET") or os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
 
 # Build ClobClient from private key (creds generated from key per docs)
 CLOB_CLIENT = None
@@ -166,12 +157,24 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 # Polymarket API endpoints
-POLYMARKET_GAMMA_API = "https://gamma-api.polymarket.com"
+POLYMARKET_GAMMA_API = (
+    os.getenv("POLYMARKET_GAMMA_API")
+    or os.getenv("POLY_GAMMA_API")
+    or "https://gamma-api.polymarket.com"
+)
 POLYMARKET_CLOB_API = "https://clob.polymarket.com"
-POLYMARKET_DATA_API = "https://data-api.polymarket.com"
+POLYMARKET_DATA_API = (
+    os.getenv("POLYMARKET_DATA_API")
+    or os.getenv("POLY_DATA_API")
+    or "https://data-api.polymarket.com"
+)
 
 # Thresholds for whale detection
-MIN_WHALE_BET_USD = 20000  # Raised from 10k - $20k+ considered whale bet
+MIN_WHALE_BET_USD = float(
+    os.getenv("MIN_WHALE_BET_USD")
+    or os.getenv("MIN_WHALE_USD")
+    or "20000"
+)
 MIN_VOLUME_SPIKE_MULTIPLIER = 5  # 5x normal volume
 MIN_SMART_TRADER_WIN_RATE = 0.65
 MIN_SMART_TRADER_TRADES = 20
@@ -189,7 +192,7 @@ MIN_SMART_TRADER_BET = 100
 MIN_CONSENSUS_TOTAL = 200
 
 # Liquidity filter (skip thin markets when liquidity is known)
-MIN_LIQUIDITY_USD = 100000
+MIN_LIQUIDITY_USD = float(os.getenv("MIN_LIQUIDITY_USD", "10000"))
 ALERT_COOLDOWN_MINUTES = 120
 
 # Smart money thresholds (closed positions)

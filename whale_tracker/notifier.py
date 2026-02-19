@@ -4,7 +4,6 @@ import logging
 from typing import Optional, Dict
 
 import aiohttp
-import tweepy
 
 from .config import SETTINGS
 
@@ -12,9 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 class Notifier:
-    def __init__(self, dry_run: bool = False):
+    def __init__(self, dry_run: bool = False, settings=None):
         self._session: Optional[aiohttp.ClientSession] = None
         self.dry_run = dry_run
+        self.settings = settings or SETTINGS
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if not self._session or self._session.closed:
@@ -56,42 +56,27 @@ class Notifier:
             lines.append(f"Link: {market_url}")
         return "\n".join(lines)
 
-    async def send_telegram(self, message: str):
-        if not SETTINGS.TELEGRAM_BOT_TOKEN or not SETTINGS.TELEGRAM_CHAT_ID:
-            return
+    async def send_telegram(self, message: str) -> bool:
+        if not self.settings.TELEGRAM_BOT_TOKEN or not self.settings.TELEGRAM_CHAT_ID:
+            logger.warning(
+                "Telegram disabled: missing %s%s",
+                "TELEGRAM_BOT_TOKEN" if not self.settings.TELEGRAM_BOT_TOKEN else "",
+                " and TELEGRAM_CHAT_ID" if not self.settings.TELEGRAM_CHAT_ID else "",
+            )
+            return False
         session = await self._get_session()
-        url = f"https://api.telegram.org/bot{SETTINGS.TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {"chat_id": SETTINGS.TELEGRAM_CHAT_ID, "text": message}
+        url = f"https://api.telegram.org/bot{self.settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+        payload = {"chat_id": self.settings.TELEGRAM_CHAT_ID, "text": message}
         try:
             async with session.post(url, json=payload) as resp:
                 if resp.status != 200:
                     body = await resp.text()
                     logger.warning("Telegram error %s: %s", resp.status, body[:200])
+                    return False
+                return True
         except Exception as exc:
             logger.warning("Telegram send failed: %s", exc)
-
-    async def send_x(self, message: str):
-        if not SETTINGS.X_POST_ENABLED:
-            return
-        if not all([
-            SETTINGS.X_CONSUMER_KEY,
-            SETTINGS.X_CONSUMER_SECRET,
-            SETTINGS.X_ACCESS_TOKEN,
-            SETTINGS.X_ACCESS_TOKEN_SECRET,
-        ]):
-            logger.warning("X posting enabled but missing credentials")
-            return
-        try:
-            auth = tweepy.OAuth1UserHandler(
-                SETTINGS.X_CONSUMER_KEY,
-                SETTINGS.X_CONSUMER_SECRET,
-                SETTINGS.X_ACCESS_TOKEN,
-                SETTINGS.X_ACCESS_TOKEN_SECRET,
-            )
-            api = tweepy.API(auth)
-            api.update_status(message[:270])
-        except Exception as exc:
-            logger.warning("X post failed: %s", exc)
+            return False
 
     async def notify(self, activity: Dict):
         msg = self._format_message(activity)
@@ -99,5 +84,3 @@ class Notifier:
             logger.info("Dry run alert:\n%s", msg)
             return
         await self.send_telegram(msg)
-        if SETTINGS.X_POST_ENABLED:
-            await self.send_x(msg)
