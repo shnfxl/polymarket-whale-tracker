@@ -4,6 +4,7 @@ import asyncio
 import logging
 
 import argparse
+from pathlib import Path
 from dotenv import load_dotenv
 
 from .detector import WhaleDetector
@@ -12,7 +13,7 @@ from .config import SETTINGS
 
 
 async def run_loop(args):
-    load_dotenv()
+    load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     overrides = {
