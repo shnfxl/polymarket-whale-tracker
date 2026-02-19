@@ -74,10 +74,14 @@ Compatibility aliases still accepted:
 Each Telegram alert includes:
 - market title
 - side + price
-- USD size
-- shortened wallet
-- same-side whale count (cluster signal)
-- market link (when available)
+- trade size (current trade)
+- full wallet address
+- cluster context when applicable:
+  - cluster wallet count (and other-wallet count)
+  - cluster notional (same-side lookback sum)
+- conditional link:
+  - single-wallet signal: trader profile link
+  - cluster signal: market link
 
 ## Notes
 - `.env` is loaded automatically at startup.

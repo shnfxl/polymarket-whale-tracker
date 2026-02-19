@@ -1,10 +1,14 @@
 import asyncio
+import logging
 import math
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 from .config import SETTINGS, Settings, utc_now
 from .api_client import PolymarketAPIClient
+
+logger = logging.getLogger(__name__)
+
 
 class PolymarketDataGenerator:
     """Generates activity data from real Polymarket API"""
@@ -14,6 +18,7 @@ class PolymarketDataGenerator:
         self.settings = settings or SETTINGS
         self.last_check_time: Dict[str, datetime] = {}
         self.processed_trades: set = set()  # Track processed trade IDs
+        self._processed_trade_order: List[str] = []
         self.market_quality_cache: Dict[str, Tuple[datetime, Dict]] = {}
         self.api_semaphore = asyncio.Semaphore(max(1, self.settings.API_CONCURRENCY_LIMIT))
         self._cycle_trader_stats_cache: Dict[str, Dict] = {}
@@ -105,6 +110,19 @@ class PolymarketDataGenerator:
 
     def snapshot_gate_counters(self) -> Dict[str, int]:
         return dict(self.gate_counters)
+
+    def _remember_processed_trade(self, trade_id: str):
+        if not trade_id or trade_id in self.processed_trades:
+            return
+        self.processed_trades.add(trade_id)
+        self._processed_trade_order.append(trade_id)
+        trim_target = max(1, int(self.settings.PROCESSED_TRADES_TRIM_TO))
+        max_size = max(trim_target, int(self.settings.PROCESSED_TRADES_MAX))
+        if len(self._processed_trade_order) <= max_size:
+            return
+        while len(self._processed_trade_order) > trim_target:
+            old_id = self._processed_trade_order.pop(0)
+            self.processed_trades.discard(old_id)
 
     def _is_popular_category(self, market: Dict) -> bool:
         """Filter markets to popular categories via keyword match."""
@@ -331,7 +349,7 @@ class PolymarketDataGenerator:
         )
         self._count_gate("input_trades", len(trades))
         if self.settings.DEBUG_LOG_API:
-            print(f"DEBUG: whale_bet trades={len(trades)} min_cash={whale_min_fetch}")
+            logger.debug("DEBUG: whale_bet trades=%s min_cash=%s", len(trades), whale_min_fetch)
 
         if not trades:
             return []
@@ -409,7 +427,7 @@ class PolymarketDataGenerator:
             if market_gates_enabled and self._is_short_duration_market(market):
                 if self.settings.DEBUG_LOG_API:
                     hours = self._market_hours_remaining(market)
-                    print(f"DEBUG: short duration filtered market={market_condition_id} hours={hours:.1f}")
+                    logger.debug("DEBUG: short duration filtered market=%s hours=%.1f", market_condition_id, hours)
                 self._count_gate("reject_short_duration")
                 continue
 
@@ -438,7 +456,11 @@ class PolymarketDataGenerator:
             effective_threshold = self._get_effective_whale_threshold(market, adaptive_abs_threshold)
             if market_gates_enabled and is_sports and amount_usd < effective_threshold:
                 if self.settings.DEBUG_LOG_API:
-                    print(f"DEBUG: sports threshold filtered amount={amount_usd:.0f} < threshold={effective_threshold:.0f}")
+                    logger.debug(
+                        "DEBUG: sports threshold filtered amount=%.0f < threshold=%.0f",
+                        amount_usd,
+                        effective_threshold,
+                    )
                 self._count_gate("reject_sports_threshold")
                 continue
 
@@ -490,7 +512,7 @@ class PolymarketDataGenerator:
                 market_quality = await self._get_market_quality(market_condition_id)
                 if not self._passes_market_quality(market_quality):
                     if self.settings.DEBUG_LOG_API:
-                        print(
+                        logger.debug(
                             "DEBUG: market quality filtered "
                             f"{market_condition_id} stats={market_quality}"
                         )
@@ -525,7 +547,7 @@ class PolymarketDataGenerator:
             reference_price = odds_after if odds_after is not None else odds_before
             if market_gates_enabled and self._in_tail_price_band(reference_price):
                 if self.settings.DEBUG_LOG_API:
-                    print(
+                    logger.debug(
                         "DEBUG: tail price filtered "
                         f"market={market_condition_id} price={reference_price:.4f}"
                     )
@@ -584,10 +606,7 @@ class PolymarketDataGenerator:
                 if not impact_signal and not (self.settings.ALLOW_SPARSE_FLOW_BYPASS and sparse_flow and same_side_whales >= self.settings.FLOW_GATE_CLUSTER_MIN):
                     self._count_gate("reject_impact_quality")
                     continue
-            self.processed_trades.add(trade_id)
-            if len(self.processed_trades) > self.settings.PROCESSED_TRADES_MAX:
-                # Trim to most recent trades (by timestamp if available, else arbitrary)
-                self.processed_trades = set(list(self.processed_trades)[-self.settings.PROCESSED_TRADES_TRIM_TO:])
+            self._remember_processed_trade(trade_id)
 
             candidates.append({
                 "type": "whale_bet",
@@ -645,14 +664,18 @@ class PolymarketDataGenerator:
         """Detect coordinated smart money activity."""
         if limit is None:
             limit = self.settings.MAX_CANDIDATES_PER_TYPE
-        print("Running smart money detection...")
+        logger.info("Running smart money detection...")
 
         trades = await self._cached_fetch_recent_trades(
             since_minutes=self.settings.SMART_LOOKBACK_MINUTES,
             min_cash=self.settings.MIN_SMART_TRADER_BET
         )
         if self.settings.DEBUG_LOG_API:
-            print(f"DEBUG: smart_money trades={len(trades)} min_cash={self.settings.MIN_SMART_TRADER_BET}")
+            logger.debug(
+                "DEBUG: smart_money trades=%s min_cash=%s",
+                len(trades),
+                self.settings.MIN_SMART_TRADER_BET,
+            )
         recent_cutoff = utc_now() - timedelta(minutes=self.settings.SMART_WINDOW_MINUTES)
 
         market_trades: Dict[str, Dict[str, List[Dict]]] = {}
@@ -829,9 +852,9 @@ class PolymarketDataGenerator:
         scan_cap = max(0, int(self.settings.VOLUME_MARKET_SCAN_LIMIT or 0))
         if scan_cap:
             markets = markets[:scan_cap]
-        print(f"Markets scanned for volume spikes: {len(markets)}")
+        logger.info("Markets scanned for volume spikes: %s", len(markets))
         if self.settings.DEBUG_LOG_API:
-            print(f"DEBUG: volume_spike markets={len(markets)}")
+            logger.debug("DEBUG: volume_spike markets=%s", len(markets))
 
         candidates: List[Dict] = []
         for market in markets:

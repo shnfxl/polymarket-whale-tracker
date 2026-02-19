@@ -1,4 +1,15 @@
-from .config import *
+from __future__ import annotations
+
+import asyncio
+import logging
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple
+
+import aiohttp
+
+from .config import SETTINGS, Settings, utc_now
+
+logger = logging.getLogger(__name__)
 
 class PolymarketAPIClient:
     """Client for fetching real Polymarket data"""
@@ -33,7 +44,7 @@ class PolymarketAPIClient:
 
     def _debug(self, msg: str):
         if self.settings.DEBUG_LOG_API:
-            print(msg)
+            logger.debug(msg)
 
     @staticmethod
     def _endpoint_key(url: str) -> str:
@@ -85,7 +96,7 @@ class PolymarketAPIClient:
                         if resp.status == 429 or resp.status >= 500:
                             retry_after = resp.headers.get("retry-after")
                             if self.settings.DEBUG_LOG_API:
-                                print(
+                                logger.debug(
                                     f"API {resp.status} {url} retry_after={retry_after} "
                                     f"(attempt {attempt + 1}/{retries + 1})"
                                 )
@@ -110,7 +121,13 @@ class PolymarketAPIClient:
                 self._api_stats["timeouts"] = int(self._api_stats.get("timeouts", 0)) + 1
                 self._api_stats["retries"] = int(self._api_stats.get("retries", 0)) + 1
                 if self.settings.DEBUG_LOG_API:
-                    print(f"API timeout after {timeout_seconds}s for {url} (attempt {attempt + 1}/{retries + 1})")
+                    logger.debug(
+                        "API timeout after %ss for %s (attempt %s/%s)",
+                        timeout_seconds,
+                        url,
+                        attempt + 1,
+                        retries + 1,
+                    )
                 await asyncio.sleep(1 + attempt)
             except Exception as e:
                 last_err = e
@@ -118,7 +135,13 @@ class PolymarketAPIClient:
                 if attempt < retries:
                     self._api_stats["retries"] = int(self._api_stats.get("retries", 0)) + 1
                 if self.settings.DEBUG_LOG_API:
-                    print(f"API error for {url}: {e!r} (attempt {attempt + 1}/{retries + 1})")
+                    logger.debug(
+                        "API error for %s: %r (attempt %s/%s)",
+                        url,
+                        e,
+                        attempt + 1,
+                        retries + 1,
+                    )
                 await asyncio.sleep(1 + attempt)
         raise last_err
 
@@ -245,7 +268,7 @@ class PolymarketAPIClient:
             self._debug(f"DEBUG: closed-positions user={address[:6]}... raw={len(raw)}")
         except Exception as e:
             if not self._trade_error_logged:
-                print(f"Error fetching closed positions: {e}")
+                logger.warning("Error fetching closed positions: %s", e)
                 self._trade_error_logged = True
             return []
 
@@ -292,7 +315,7 @@ class PolymarketAPIClient:
                     "slug": market.get("slug", "")
                 }
                 if self.settings.DEBUG_LOG_API and idx < 5:
-                    print(
+                    logger.debug(
                         "DEBUG: market sample "
                         f"title={mapped['title']!r} "
                         f"liquidity={mapped['liquidity']} "
@@ -310,7 +333,7 @@ class PolymarketAPIClient:
                 markets.sort(key=lambda m: float(m.get(key, 0) or 0), reverse=True)
             return markets
         except Exception as e:
-            print(f"Error fetching markets: {e}")
+            logger.warning("Error fetching markets: %s", e)
         return []
 
     async def fetch_recent_trades(
@@ -353,7 +376,7 @@ class PolymarketAPIClient:
                 )
             except Exception as e:
                 if not self._trade_error_logged:
-                    print(f"Error fetching trades from Data API: {e}")
+                    logger.warning("Error fetching trades from Data API: %s", e)
                     self._trade_error_logged = True
                 break
 

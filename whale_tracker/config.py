@@ -2,17 +2,9 @@
 """Runtime settings for the Polymarket whale tracker."""
 
 from pathlib import Path
-import random
 import os
-import json
-import math
 from datetime import datetime, timedelta, timezone
-from time import perf_counter
-from typing import Any, Dict, List, Optional, Tuple
-from dataclasses import dataclass
-import asyncio
-import aiohttp
-import argparse
+from typing import Any, Dict, List, Optional
 
 # Get API keys - only private key needed per Polymarket docs
 POLYMARKET_PRIVATE_KEY = (os.getenv('POLYMARKET_PRIVATE_KEY') or '').strip()
@@ -141,16 +133,6 @@ if POLYMARKET_PRIVATE_KEY:
         pass
     except Exception:
         pass
-
-if not POLYMARKET_PRIVATE_KEY:
-    pass
-
-if not TELEGRAM_BOT_TOKEN:
-    pass
-
-if not HAS_CLOB_AUTH:
-    pass
-
 
 def utc_now() -> datetime:
     """Return UTC now as naive datetime for compatibility with existing comparisons."""
