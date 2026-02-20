@@ -2,10 +2,11 @@
 
 Open-source bot that scans Polymarket for large trades and sends Telegram alerts.
 
-<img width="2900" height="1268" alt="image" src="https://github.com/user-attachments/assets/6c453570-f330-4371-ba7b-2a0fdc50bd6b" />
+<img width="1450" height="634" alt="poly_snip" src="https://github.com/user-attachments/assets/6377146d-195b-43e4-9315-f0f191b36af7" />
 
 
 ## What It Does
+
 - Polls Polymarket markets + recent trades
 - Detects whale-sized bets with market-quality gates
 - Enriches alerts with wallet/trade context
