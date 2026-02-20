@@ -30,6 +30,7 @@ class PolymarketDataGenerator:
         self._cycle_trader_recent_cache: Dict[Tuple[str, int], List[Dict]] = {}
         self._cycle_market_flow_cache: Dict[Tuple[str, int], Dict] = {}
         self._cycle_net_position_cache: Dict[Tuple[str, str, int], float] = {}
+        self._cycle_market_position_cache: Dict[Tuple[str, str], Optional[float]] = {}
         self.gate_counters: Dict[str, int] = {}
         self.reset_gate_counters()
 
@@ -39,6 +40,7 @@ class PolymarketDataGenerator:
         self._cycle_trader_recent_cache.clear()
         self._cycle_market_flow_cache.clear()
         self._cycle_net_position_cache.clear()
+        self._cycle_market_position_cache.clear()
 
     async def _run_limited(self, coro):
         async with self.api_semaphore:
@@ -88,6 +90,14 @@ class PolymarketDataGenerator:
             self.api_client.get_net_position_change(address, market_id, minutes=minutes)
         )
         self._cycle_net_position_cache[key] = result
+        return result
+
+    async def _cached_get_market_position_size(self, address: str, market_id: str) -> Optional[float]:
+        key = ((address or "").lower(), market_id)
+        if key in self._cycle_market_position_cache:
+            return self._cycle_market_position_cache[key]
+        result = await self._run_limited(self.api_client.get_market_position_size_usd(address, market_id))
+        self._cycle_market_position_cache[key] = result
         return result
 
     def reset_gate_counters(self):
@@ -522,12 +532,13 @@ class PolymarketDataGenerator:
 
             # Get trader stats
             trader_address = trade.get("user", "")
-            trader_stats, trader_recent, net_change, flow_1h, flow_24h = await asyncio.gather(
+            trader_stats, trader_recent, net_change, flow_1h, flow_24h, market_position_size = await asyncio.gather(
                 self._cached_get_trader_stats(trader_address),
                 self._cached_fetch_recent_trades(since_minutes=60 * 24, user=trader_address),
                 self._cached_get_net_position_change(trader_address, market_condition_id, minutes=60),
                 self._cached_get_market_flow(market_condition_id, minutes=60),
                 self._cached_get_market_flow(market_condition_id, minutes=60 * 24),
+                self._cached_get_market_position_size(trader_address, market_condition_id),
             )
             wallet_tier = self._wallet_tier(float(trader_stats.get("total_volume", 0) or 0))
             trader_class = self._classify_trader(trader_recent)
@@ -639,6 +650,7 @@ class PolymarketDataGenerator:
                 "is_new_trader": trader_stats.get("trade_count", 0) <= 3,
                 "is_sports_market": is_sports,
                 "market_category": market_category,
+                "market_position_size_usd": market_position_size,
                 "odds_before": odds_before,
                 "odds_after": odds_after,
                 "net_position_1h": net_change,

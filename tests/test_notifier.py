@@ -13,13 +13,17 @@ class NotifierTests(unittest.IsolatedAsyncioTestCase):
         activity = {
             "market": {"title": "Will BTC exceed $100k?"},
             "market_url": "https://polymarket.com/market/btc-100k",
-            "whale": {"address": "0x1234567890abcdef1234567890abcdef12345678"},
+            "whale": {
+                "address": "0x1234567890abcdef1234567890abcdef12345678",
+                "total_volume": 52041,
+            },
             "side": "YES",
             "amount": 25000,
             "odds_after": 0.734,
             "same_side_whales": 2,
             "same_side_other_whales": 1,
             "same_side_notional": 47000,
+            "market_position_size_usd": 52000,
         }
 
         msg = notifier._format_message(activity)
@@ -29,6 +33,8 @@ class NotifierTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("🟢 Side: YES @ 0.734", msg)
         self.assertIn("💵 Trade size: $25,000", msg)
         self.assertIn("🧾 Wallet: 0x1234567890abcdef1234567890abcdef12345678", msg)
+        self.assertIn("📊 Wallet volume (7d): $52,041", msg)
+        self.assertIn("🎒 Market position size: $52,000", msg)
         self.assertIn("👥 Cluster wallets (same side): 2 (1 other)", msg)
         self.assertIn("📦 Cluster notional (lookback): $47,000", msg)
         self.assertIn("🔗 Market: https://polymarket.com/market/btc-100k", msg)
@@ -39,7 +45,10 @@ class NotifierTests(unittest.IsolatedAsyncioTestCase):
         activity = {
             "market": {"title": "Will ETH exceed $8k?"},
             "market_url": "https://polymarket.com/market/eth-8k",
-            "whale": {"address": "0xaabbccddeeff00112233445566778899aabbccdd"},
+            "whale": {
+                "address": "0xaabbccddeeff00112233445566778899aabbccdd",
+                "total_volume": 68123,
+            },
             "side": "NO",
             "side_label": "NO",
             "amount": 18000,
@@ -51,6 +60,7 @@ class NotifierTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("🔴 Side: NO @ 0.321", msg)
         self.assertIn("🧾 Wallet: 0xaabbccddeeff00112233445566778899aabbccdd", msg)
+        self.assertIn("📊 Wallet volume (7d): $68,123", msg)
         self.assertIn("🔗 Trader: https://polymarket.com/profile/0xaabbccddeeff00112233445566778899aabbccdd", msg)
         self.assertNotIn("🔗 Market: https://polymarket.com/market/eth-8k", msg)
 

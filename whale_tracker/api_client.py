@@ -33,6 +33,7 @@ class PolymarketAPIClient:
             "other_errors": 0,
             "by_endpoint": {},
         }
+        self._market_position_cache: Dict[Tuple[str, str], Tuple[datetime, Optional[float]]] = {}
 
     async def __aenter__(self):
         self.session = aiohttp.ClientSession()
@@ -144,6 +145,78 @@ class PolymarketAPIClient:
                     )
                 await asyncio.sleep(1 + attempt)
         raise last_err
+
+    async def _try_get_json(self, url: str, params: Optional[Dict] = None):
+        try:
+            return await self._get_json(url, params=params)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _parse_position_size_usd(item: Dict) -> Optional[float]:
+        for key in ("positionValue", "currentValue", "value", "notional", "sizeUsd", "usdcValue", "totalValue", "marketValue"):
+            raw = item.get(key)
+            if raw is None:
+                continue
+            try:
+                return abs(float(raw))
+            except Exception:
+                continue
+        return None
+
+    @staticmethod
+    def _matches_market(item: Dict, market_id: str) -> bool:
+        if not market_id:
+            return True
+        keys = (
+            item.get("market"),
+            item.get("conditionId"),
+            item.get("marketId"),
+            item.get("id"),
+        )
+        wanted = str(market_id).lower()
+        return any(str(k).lower() == wanted for k in keys if k is not None)
+
+    async def get_market_position_size_usd(self, address: str, market_id: str) -> Optional[float]:
+        """Best-effort fetch of wallet position size for a market from public data APIs."""
+        if not address or not market_id:
+            return None
+        cache_key = (address.lower(), market_id)
+        cached = self._market_position_cache.get(cache_key)
+        if cached:
+            ts, value = cached
+            if (utc_now() - ts).total_seconds() < 300:
+                return value
+
+        endpoints = [
+            ("/positions", {"user": address, "market": market_id, "limit": "200", "offset": "0"}),
+            ("/open-positions", {"user": address, "market": market_id, "limit": "200", "offset": "0"}),
+            ("/positions", {"user": address, "limit": "200", "offset": "0"}),
+            ("/open-positions", {"user": address, "limit": "200", "offset": "0"}),
+        ]
+        position_value: Optional[float] = None
+        for path, params in endpoints:
+            data = await self._try_get_json(f"{self.settings.POLYMARKET_DATA_API}{path}", params=params)
+            if not data:
+                continue
+            items = data if isinstance(data, list) else data.get("positions") if isinstance(data, dict) else None
+            if not isinstance(items, list):
+                continue
+            values = []
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                if not self._matches_market(item, market_id):
+                    continue
+                parsed = self._parse_position_size_usd(item)
+                if parsed is not None:
+                    values.append(parsed)
+            if values:
+                position_value = sum(values)
+                break
+
+        self._market_position_cache[cache_key] = (utc_now(), position_value)
+        return position_value
 
     def _extract_token_id(self, market: Dict, side: str) -> Optional[str]:
         """Extract outcome token id from market data for YES/NO."""

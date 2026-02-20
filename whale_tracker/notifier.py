@@ -33,6 +33,7 @@ class Notifier:
         market = activity.get("market") or {}
         whale = activity.get("whale") or {}
         wallet = str(whale.get("address") or "")
+        wallet_volume_7d = float(whale.get("total_volume") or 0)
         market_title = market.get("title") or market.get("question") or "Unknown market"
         market_url = activity.get("market_url") or ""
         side = str(activity.get("side") or "")
@@ -49,6 +50,7 @@ class Notifier:
         same_side = int(activity.get("same_side_whales") or 0)
         same_side_other = int(activity.get("same_side_other_whales") or max(0, same_side - 1))
         same_side_notional = float(activity.get("same_side_notional") or amount)
+        market_position_size = float(activity.get("market_position_size_usd") or 0)
         is_cluster = same_side_other > 0
 
         lines = [
@@ -58,6 +60,10 @@ class Notifier:
             f"💵 Trade size: ${amount:,.0f}",
             f"🧾 Wallet: {wallet or 'unknown'}",
         ]
+        if wallet_volume_7d > 0:
+            lines.append(f"📊 Wallet volume (7d): ${wallet_volume_7d:,.0f}")
+        if market_position_size > 0:
+            lines.append(f"🎒 Market position size: ${market_position_size:,.0f}")
         if is_cluster:
             lines.append(f"👥 Cluster wallets (same side): {same_side} ({same_side_other} other)")
             lines.append(f"📦 Cluster notional (lookback): ${same_side_notional:,.0f}")
