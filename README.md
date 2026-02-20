@@ -4,6 +4,9 @@ Open-source bot that scans Polymarket for large trades and sends Telegram alerts
 
 <img width="1450" height="634" alt="poly_snip" src="https://github.com/user-attachments/assets/6377146d-195b-43e4-9315-f0f191b36af7" />
 
+## Live Telegram
+- Public alerts channel: https://t.me/polythewhalebot
+
 
 ## What It Does
 
@@ -35,6 +38,7 @@ Populate `.env` with at least:
 TELEGRAM_BOT_TOKEN=...
 TELEGRAM_CHAT_ID=...
 ```
+Set `TELEGRAM_CHAT_ID` to your own chat/group/channel ID for private delivery, or join the public channel above.
 
 Optional (price enrichment only):
 ```env
