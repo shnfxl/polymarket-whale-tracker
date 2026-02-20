@@ -74,6 +74,7 @@ python3 -m unittest discover -s tests -v
 - `MARKET_CATEGORIES`: optional comma-separated scope (`crypto,stocks,...`)
 - `DISABLE_*_GATE`: selectively disable filtering gates for debugging
 - `BOT_STATE_FILE`: JSON state file for persistent dedupe/cooldown memory (default: `memory/polymarket_state.json`)
+- `LOG_LEVEL`: logging verbosity (`INFO` default, use `DEBUG` for full diagnostics)
 
 Compatibility aliases still accepted:
 - `MIN_WHALE_USD` -> `MIN_WHALE_BET_USD`

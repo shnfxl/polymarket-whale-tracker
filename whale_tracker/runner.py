@@ -17,8 +17,6 @@ from .state_store import JsonFileStateStore
 
 async def run_loop(args):
     load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-
     overrides = {
         "DISABLE_MARKET_GATES": bool(args.disable_market_gates),
         "DISABLE_CLUSTER_GATE": bool(args.disable_cluster_gate),
@@ -27,11 +25,16 @@ async def run_loop(args):
         "DISABLE_IMPACT_GATE": bool(args.disable_impact_gate),
     }
     settings = SETTINGS.with_overrides(**overrides)
+    logging.basicConfig(
+        level=getattr(logging, settings.LOG_LEVEL, logging.INFO),
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
 
     logging.info(
-        "Whale tracker starting (poll=%ss, min_whale=$%s)",
+        "Tracker start poll=%ss min_whale=$%s log_level=%s",
         settings.POLL_INTERVAL_SECONDS,
         int(settings.MIN_WHALE_BET_USD),
+        settings.LOG_LEVEL,
     )
     if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
         logging.warning("Telegram credentials are missing; alerts will not be sent.")
@@ -49,9 +52,11 @@ async def run_loop(args):
     try:
         while True:
             signals = await detector.scan()
-            logging.info("Scan complete: %s signals", len(signals))
+            sent = 0
             for sig in signals:
-                await notifier.notify(sig)
+                if await notifier.notify(sig):
+                    sent += 1
+            logging.info("Scan complete candidates=%s sent=%s", len(signals), sent)
             if args.once:
                 break
             await asyncio.sleep(settings.POLL_INTERVAL_SECONDS)

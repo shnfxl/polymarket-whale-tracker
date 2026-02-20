@@ -94,9 +94,14 @@ class Notifier:
             logger.warning("Telegram send failed: %s", exc)
             return False
 
-    async def notify(self, activity: Dict):
+    async def notify(self, activity: Dict) -> bool:
         msg = self._format_message(activity)
+        market = (activity.get("market") or {}).get("title") or "Unknown market"
+        amount = float(activity.get("amount") or 0)
         if self.dry_run:
-            logger.info("Dry run alert:\n%s", msg)
-            return
-        await self.send_telegram(msg)
+            logger.info("Alert dry-run market=%s amount=$%s", market, f"{amount:,.0f}")
+            return True
+        ok = await self.send_telegram(msg)
+        if ok:
+            logger.info("Alert sent market=%s amount=$%s", market, f"{amount:,.0f}")
+        return ok

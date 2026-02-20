@@ -108,6 +108,7 @@ CATEGORY_KEYWORDS: Dict[str, List[str]] = {
 
 @dataclass(frozen=True)
 class Settings:
+    LOG_LEVEL: str
     TELEGRAM_BOT_TOKEN: Optional[str]
     TELEGRAM_CHAT_ID: Optional[str]
 
@@ -231,6 +232,7 @@ class Settings:
             smart_min_realized_pnl_usd = 500.0
 
         settings = cls(
+            LOG_LEVEL=_env_str("INFO", "LOG_LEVEL").upper(),
             TELEGRAM_BOT_TOKEN=_env_first("TELEGRAM_BOT_TOKEN", "TELEGRAM_TOKEN", "TG_BOT_TOKEN"),
             TELEGRAM_CHAT_ID=_env_first("TELEGRAM_CHAT_ID", "TELEGRAM_CHANNEL_ID", "TELEGRAM_CHAT"),
             POLYMARKET_PRIVATE_KEY=private_key,
@@ -325,6 +327,8 @@ class Settings:
             raise ValueError("PROCESSED_TRADES_TRIM_TO must be <= PROCESSED_TRADES_MAX")
         if self.MARKET_SORT_BY not in ("volume", "liquidity", "none"):
             raise ValueError("MARKET_SORT_BY must be one of: volume, liquidity, none")
+        if self.LOG_LEVEL not in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"):
+            raise ValueError("LOG_LEVEL must be one of: DEBUG, INFO, WARNING, ERROR, CRITICAL")
 
     def with_overrides(self, **kwargs) -> "Settings":
         updated = replace(self, **kwargs)

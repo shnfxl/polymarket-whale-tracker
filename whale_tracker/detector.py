@@ -44,5 +44,6 @@ class WhaleDetector:
         self.data_generator.start_cycle()
         whale_bets = await self.data_generator.generate_whale_bets(limit=self.settings.MAX_CANDIDATES_PER_TYPE)
         gates = self.data_generator.snapshot_gate_counters()
-        logger.info("Whale scan: candidates=%s gates=%s", len(whale_bets), gates)
+        if getattr(self.settings, "DEBUG_LOG_API", False):
+            logger.debug("Whale scan gates=%s", gates)
         return whale_bets
