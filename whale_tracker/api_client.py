@@ -20,7 +20,6 @@ class PolymarketAPIClient:
         self.clob_client = clob_client if clob_client is not None else self.settings.CLOB_CLIENT
         self.session: Optional[aiohttp.ClientSession] = None
         self.market_cache: Dict[str, Dict] = {}
-        self.volume_history: Dict[str, List[Tuple[datetime, float]]] = {}  # market_id -> [(timestamp, volume)]
         self.trader_stats_cache: Dict[str, Dict] = {}
         self._trade_error_logged = False  # Track if we've logged trade errors
         self._last_trade_fetch: Optional[datetime] = None
@@ -326,40 +325,6 @@ class PolymarketAPIClient:
             "trade_count": len(trades)
         }
 
-    async def fetch_closed_positions(self, address: str, since_days: int = 30) -> List[Dict]:
-        """Fetch closed positions for a user from Data API and filter by time."""
-        if not self.session:
-            self.session = aiohttp.ClientSession()
-
-        params = {
-            "user": address,
-            "limit": "200",
-            "offset": "0"
-        }
-        try:
-            raw = await self._get_json(f"{self.settings.POLYMARKET_DATA_API}/closed-positions", params=params)
-            self._debug(f"DEBUG: closed-positions user={address[:6]}... raw={len(raw)}")
-        except Exception as e:
-            if not self._trade_error_logged:
-                logger.warning("Error fetching closed positions: %s", e)
-                self._trade_error_logged = True
-            return []
-
-        cutoff = utc_now() - timedelta(days=since_days)
-        out = []
-        for p in raw:
-            ts = p.get("timestamp")
-            if ts is None:
-                continue
-            try:
-                closed_time = datetime.fromtimestamp(int(ts), timezone.utc).replace(tzinfo=None)
-            except Exception:
-                continue
-            if closed_time < cutoff:
-                continue
-            out.append(p)
-        return out
-
     async def fetch_markets(self, limit: int = 100, active: bool = True, sort_by: str = "none") -> List[Dict]:
         """Fetch active markets from Polymarket Gamma API (REST)"""
         if not self.session:
@@ -592,71 +557,19 @@ class PolymarketAPIClient:
             min(avg_bet / 2000, 5)           # bet confidence
         )
 
-        # Closed positions stats (for win rate)
-        closed = await self.fetch_closed_positions(address, since_days=self.settings.SMART_WINDOW_DAYS)
-        closed_count = len(closed)
-        wins = 0
-        total_bought = 0.0
-        total_pnl = 0.0
-        for p in closed:
-            pnl = float(p.get("realizedPnl", 0) or 0)
-            bought = float(p.get("totalBought", 0) or 0)
-            total_bought += bought
-            total_pnl += pnl
-            if pnl > 0:
-                wins += 1
-
-        win_rate = wins / closed_count if closed_count > 0 else 0
-        avg_position = (total_bought / closed_count) if closed_count > 0 else 0
-
         stats = {
             "address": address,
             "total_volume": total_volume,
             "trade_count": trade_count,
             "avg_bet": avg_bet,
             "credibility": round(credibility_score, 2),
-            "closed_positions": closed_count,
-            "win_rate": round(win_rate, 3),
-            "avg_position": avg_position,
-            "realized_pnl": total_pnl,
+            "closed_positions": 0,
+            "win_rate": 0.0,
+            "avg_position": 0.0,
+            "realized_pnl": 0.0,
             "last_updated": datetime.now()
         }
 
         self.trader_stats_cache[address] = stats
 
         return stats
-
-
-
-    async def get_market_volume_history(self, market_id: str, hours: int = 24) -> List[float]:
-        """Get volume history for a market"""
-        if market_id not in self.volume_history:
-            self.volume_history[market_id] = []
-
-        # Fetch recent trades and calculate hourly volumes
-        trades = await self.fetch_recent_trades(market_id=market_id, since_minutes=hours * 60)
-
-        # Group by hour
-        hourly_volumes = {}
-        for trade in trades:
-            hour_key = trade["timestamp"].replace(minute=0, second=0, microsecond=0)
-            if hour_key not in hourly_volumes:
-                hourly_volumes[hour_key] = 0
-            hourly_volumes[hour_key] += trade.get("amount", 0)
-
-        # Update cache
-        existing_hours = {ts for ts, _ in self.volume_history[market_id]}
-        for hour, volume in hourly_volumes.items():
-            if hour not in existing_hours:
-                self.volume_history[market_id].append((hour, volume))
-                existing_hours.add(hour)
-
-
-        # Keep only last 24 hours
-        cutoff = utc_now() - timedelta(hours=hours)
-        self.volume_history[market_id] = [
-            (ts, vol) for ts, vol in self.volume_history[market_id]
-            if ts >= cutoff
-        ]
-
-        return [vol for _, vol in self.volume_history[market_id]]

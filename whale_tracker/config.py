@@ -128,20 +128,13 @@ class Settings:
     TRADER_STATS_CACHE_TTL_SECONDS: int
 
     WHALE_LOOKBACK_MINUTES: int
-    SMART_LOOKBACK_MINUTES: int
-    SMART_WINDOW_MINUTES: int
-    SMART_WINDOW_DAYS: int
-    VOLUME_NOTABLE_LOOKBACK_MINUTES: int
 
     MARKET_LIMIT: int
-    VOLUME_MARKET_SCAN_LIMIT: int
     MARKET_SORT_BY: str
 
     MIN_WHALE_BET_USD: float
     MIN_LIQUIDITY_USD: float
     MIN_MARKET_VOLUME_24H: float
-    MIN_VOLUME_SPIKE_1H_USD: float
-    MIN_VOLUME_SPIKE_MULTIPLIER: float
     MIN_PRICE_BAND: float
     MAX_PRICE_BAND: float
 
@@ -183,13 +176,6 @@ class Settings:
     IMPACT_GATE_MIN_ABS: float
     IMPACT_GATE_MIN_PCT: float
 
-    MIN_SMART_TRADERS: int
-    MIN_SMART_TRADER_BET: float
-    MIN_CONSENSUS_TOTAL: float
-    SMART_MIN_CLOSED_POSITIONS: int
-    SMART_MIN_AVG_POSITION_USD: float
-    SMART_MIN_REALIZED_PNL_USD: float
-
     MAX_CANDIDATES_PER_TYPE: int
     MAX_WHALE_ENRICH_TRADES: int
 
@@ -214,23 +200,11 @@ class Settings:
         lower_thresholds = _env_bool(False, "LOWER_THRESHOLDS")
 
         min_whale_bet = _env_float(20000.0, "MIN_WHALE_BET_USD", "MIN_WHALE_USD")
-        min_volume_spike_multiplier = _env_float(5.0, "MIN_VOLUME_SPIKE_MULTIPLIER")
-        min_smart_trader_bet = _env_float(100.0, "MIN_SMART_TRADER_BET")
-        min_consensus_total = _env_float(200.0, "MIN_CONSENSUS_TOTAL")
         min_liquidity_usd = _env_float(10000.0, "MIN_LIQUIDITY_USD")
-        smart_min_closed_positions = _env_int(10, "SMART_MIN_CLOSED_POSITIONS")
-        smart_min_avg_position_usd = _env_float(500.0, "SMART_MIN_AVG_POSITION_USD")
-        smart_min_realized_pnl_usd = _env_float(5000.0, "SMART_MIN_REALIZED_PNL_USD")
 
         if lower_thresholds:
             min_whale_bet = 1000.0
-            min_volume_spike_multiplier = 2.0
-            min_smart_trader_bet = 100.0
-            min_consensus_total = 200.0
             min_liquidity_usd = 5000.0
-            smart_min_closed_positions = 3
-            smart_min_avg_position_usd = 100.0
-            smart_min_realized_pnl_usd = 500.0
 
         settings = cls(
             LOG_LEVEL=_env_str("INFO", "LOG_LEVEL").upper(),
@@ -249,18 +223,11 @@ class Settings:
             TRADE_MAX_PAGES=_env_int(8, "TRADE_MAX_PAGES"),
             TRADER_STATS_CACHE_TTL_SECONDS=_env_int(300, "TRADER_STATS_CACHE_TTL_SECONDS"),
             WHALE_LOOKBACK_MINUTES=_env_int(5, "WHALE_LOOKBACK_MINUTES"),
-            SMART_LOOKBACK_MINUTES=_env_int(30, "SMART_LOOKBACK_MINUTES"),
-            SMART_WINDOW_MINUTES=_env_int(15, "SMART_WINDOW_MINUTES"),
-            SMART_WINDOW_DAYS=_env_int(30, "SMART_WINDOW_DAYS"),
-            VOLUME_NOTABLE_LOOKBACK_MINUTES=_env_int(60, "VOLUME_NOTABLE_LOOKBACK_MINUTES"),
             MARKET_LIMIT=_env_int(300, "MARKET_LIMIT"),
-            VOLUME_MARKET_SCAN_LIMIT=_env_int(120, "VOLUME_MARKET_SCAN_LIMIT"),
             MARKET_SORT_BY=_env_str("volume", "MARKET_SORT_BY").lower(),
             MIN_WHALE_BET_USD=min_whale_bet,
             MIN_LIQUIDITY_USD=min_liquidity_usd,
             MIN_MARKET_VOLUME_24H=_env_float(50000.0, "MIN_MARKET_VOLUME_24H"),
-            MIN_VOLUME_SPIKE_1H_USD=_env_float(4000.0, "MIN_VOLUME_SPIKE_1H_USD"),
-            MIN_VOLUME_SPIKE_MULTIPLIER=min_volume_spike_multiplier,
             MIN_PRICE_BAND=_env_float(0.08, "MIN_PRICE_BAND"),
             MAX_PRICE_BAND=_env_float(0.92, "MAX_PRICE_BAND"),
             REL_WHALE_VOLUME_PCT=_env_float(0.02, "REL_WHALE_VOLUME_PCT"),
@@ -293,12 +260,6 @@ class Settings:
             SPARSE_FLOW_MIN_TRADES=_env_int(3, "SPARSE_FLOW_MIN_TRADES"),
             IMPACT_GATE_MIN_ABS=_env_float(0.003, "IMPACT_GATE_MIN_ABS"),
             IMPACT_GATE_MIN_PCT=_env_float(0.008, "IMPACT_GATE_MIN_PCT"),
-            MIN_SMART_TRADERS=_env_int(1, "MIN_SMART_TRADERS"),
-            MIN_SMART_TRADER_BET=min_smart_trader_bet,
-            MIN_CONSENSUS_TOTAL=min_consensus_total,
-            SMART_MIN_CLOSED_POSITIONS=smart_min_closed_positions,
-            SMART_MIN_AVG_POSITION_USD=smart_min_avg_position_usd,
-            SMART_MIN_REALIZED_PNL_USD=smart_min_realized_pnl_usd,
             MAX_CANDIDATES_PER_TYPE=_env_int(5, "MAX_CANDIDATES_PER_TYPE"),
             MAX_WHALE_ENRICH_TRADES=_env_int(20, "MAX_WHALE_ENRICH_TRADES"),
             PROCESSED_TRADES_MAX=_env_int(10000, "PROCESSED_TRADES_MAX"),

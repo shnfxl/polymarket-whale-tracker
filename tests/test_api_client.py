@@ -85,7 +85,6 @@ class TraderStatsCacheFreshnessTests(unittest.IsolatedAsyncioTestCase):
                     POLYMARKET_DATA_API="https://data-api.polymarket.com",
                     TRADE_PAGE_SIZE=50,
                     TRADE_MAX_PAGES=2,
-                    SMART_WINDOW_DAYS=30,
                     TRADER_STATS_CACHE_TTL_SECONDS=3600,
                 )
                 super().__init__(settings=settings)
