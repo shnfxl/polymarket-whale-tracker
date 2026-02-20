@@ -346,8 +346,7 @@ class PolymarketDataGenerator:
         if not trades:
             return []
 
-        same_side_clusters: Dict[Tuple[str, str], set] = {}
-        same_side_notional: Dict[Tuple[str, str], float] = {}
+        same_side_trade_details: Dict[Tuple[str, str], List[Dict[str, float]]] = {}
         market_trade_counts: Dict[str, int] = {}
         market_unique_wallets: Dict[str, set] = {}
         market_large_trade_counts: Dict[str, int] = {}
@@ -361,8 +360,10 @@ class PolymarketDataGenerator:
             if not m_id or side not in ("YES", "NO") or not user:
                 continue
             cluster_key = (m_id, side)
-            same_side_clusters.setdefault(cluster_key, set()).add(user)
-            same_side_notional[cluster_key] = same_side_notional.get(cluster_key, 0.0) + amount
+            same_side_trade_details.setdefault(cluster_key, []).append({
+                "user": user,
+                "amount": amount,
+            })
             market_trade_counts[m_id] = market_trade_counts.get(m_id, 0) + 1
             market_unique_wallets.setdefault(m_id, set()).add(user)
             if amount >= self.settings.MIN_WHALE_BET_USD:
@@ -547,8 +548,18 @@ class PolymarketDataGenerator:
                 continue
 
             cluster_key = (market_condition_id, trade.get("side", "YES"))
-            same_side_whales = len(same_side_clusters.get(cluster_key, set()))
-            same_side_cluster_notional = float(same_side_notional.get(cluster_key, 0.0))
+            cluster_trades = same_side_trade_details.get(cluster_key, [])
+            qualified_cluster_trades = [
+                t for t in cluster_trades
+                if float(t.get("amount", 0) or 0) >= effective_threshold
+            ]
+            cluster_wallets = {str(t.get("user") or "") for t in qualified_cluster_trades if t.get("user")}
+            same_side_cluster_notional = sum(float(t.get("amount", 0) or 0) for t in qualified_cluster_trades)
+            if trader_address and trader_address not in cluster_wallets:
+                # Always include the alerting trade in cluster context.
+                cluster_wallets.add(trader_address)
+                same_side_cluster_notional += amount_usd
+            same_side_whales = len(cluster_wallets)
             same_side_other_whales = max(0, same_side_whales - 1)
             if self.settings.DISABLE_CLUSTER_GATE:
                 same_side_whales = 0
