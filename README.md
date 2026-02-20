@@ -92,6 +92,8 @@ Each Telegram alert includes:
 - side + price
 - trade size (current trade)
 - full wallet address
+- wallet volume over the last 7 days (all markets)
+- optional market-specific position size (when API data is available)
 - cluster context when applicable:
   - cluster wallet count (and other-wallet count)
   - cluster notional (same-side lookback sum)
