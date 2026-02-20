@@ -73,5 +73,46 @@ class APIClientTradeParsingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(trades[0]["side_label"], "Spurs")
 
 
+class TraderStatsCacheFreshnessTests(unittest.IsolatedAsyncioTestCase):
+    async def test_force_refresh_bypasses_cache(self):
+        class StatsClient(PolymarketAPIClient):
+            def __init__(self):
+                settings = SimpleNamespace(
+                    CLOB_CLIENT=None,
+                    API_RETRIES=0,
+                    API_TIMEOUT_SECONDS=5,
+                    DEBUG_LOG_API=False,
+                    POLYMARKET_DATA_API="https://data-api.polymarket.com",
+                    TRADE_PAGE_SIZE=50,
+                    TRADE_MAX_PAGES=2,
+                    SMART_WINDOW_DAYS=30,
+                    TRADER_STATS_CACHE_TTL_SECONDS=3600,
+                )
+                super().__init__(settings=settings)
+                self.calls = 0
+                self.session = object()
+
+            async def fetch_recent_trades(self, **kwargs):
+                self.calls += 1
+                return [{
+                    "user": (kwargs.get("user") or "").lower(),
+                    "amount": 100.0,
+                }]
+
+            async def fetch_closed_positions(self, address: str, since_days: int = 30):
+                return []
+
+        client = StatsClient()
+        addr = "0xabc"
+        _ = await client.get_trader_stats(addr)
+        self.assertEqual(client.calls, 1)
+
+        _ = await client.get_trader_stats(addr)
+        self.assertEqual(client.calls, 1)
+
+        _ = await client.get_trader_stats(addr, force_refresh=True)
+        self.assertEqual(client.calls, 2)
+
+
 if __name__ == "__main__":
     unittest.main()

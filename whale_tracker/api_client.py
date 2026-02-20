@@ -545,14 +545,16 @@ class PolymarketAPIClient:
         return None
 
 
-    async def get_trader_stats(self, address: str) -> Dict:
+    async def get_trader_stats(self, address: str, force_refresh: bool = False) -> Dict:
         """Get trader statistics using credibility metrics instead of fake win rate"""
 
         # Cache check
         cached = self.trader_stats_cache.get(address)
         if cached:
-            # Refresh every 6 hours
-            if (datetime.now() - cached.get("last_updated", datetime.min)).total_seconds() < 21600:
+            ttl_seconds = max(0, int(getattr(self.settings, "TRADER_STATS_CACHE_TTL_SECONDS", 300)))
+            if force_refresh:
+                ttl_seconds = 0
+            if (datetime.now() - cached.get("last_updated", datetime.min)).total_seconds() < ttl_seconds:
                 return cached
 
         # Pull last 7 days of trades

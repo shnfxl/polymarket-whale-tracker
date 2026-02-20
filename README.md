@@ -72,6 +72,7 @@ python3 -m unittest discover -s tests -v
 ## Key Config
 - `POLL_INTERVAL_SECONDS`: scan frequency
 - `MIN_WHALE_BET_USD`: absolute whale threshold
+- `TRADER_STATS_CACHE_TTL_SECONDS`: wallet stats cache lifetime in seconds (lower = fresher wallet context)
 - `MIN_LIQUIDITY_USD`: market liquidity floor used by filters
 - `MIN_MARKET_VOLUME_24H`: 24h volume floor used by filters
 - `MARKET_CATEGORIES`: optional comma-separated scope (`crypto,stocks,...`)

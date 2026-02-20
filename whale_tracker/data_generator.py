@@ -46,11 +46,11 @@ class PolymarketDataGenerator:
         async with self.api_semaphore:
             return await coro
 
-    async def _cached_get_trader_stats(self, address: str) -> Dict:
-        key = (address or "").lower()
+    async def _cached_get_trader_stats(self, address: str, force_refresh: bool = False) -> Dict:
+        key = ((address or "").lower(), bool(force_refresh))
         if key in self._cycle_trader_stats_cache:
             return self._cycle_trader_stats_cache[key]
-        result = await self._run_limited(self.api_client.get_trader_stats(address))
+        result = await self._run_limited(self.api_client.get_trader_stats(address, force_refresh=force_refresh))
         self._cycle_trader_stats_cache[key] = result
         return result
 
@@ -533,7 +533,7 @@ class PolymarketDataGenerator:
             # Get trader stats
             trader_address = trade.get("user", "")
             trader_stats, trader_recent, net_change, flow_1h, flow_24h, market_position_size = await asyncio.gather(
-                self._cached_get_trader_stats(trader_address),
+                self._cached_get_trader_stats(trader_address, force_refresh=True),
                 self._cached_fetch_recent_trades(since_minutes=60 * 24, user=trader_address),
                 self._cached_get_net_position_change(trader_address, market_condition_id, minutes=60),
                 self._cached_get_market_flow(market_condition_id, minutes=60),
