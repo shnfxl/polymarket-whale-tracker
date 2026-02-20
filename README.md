@@ -16,6 +16,8 @@ Open-source bot that scans Polymarket for large trades and sends Telegram alerts
 - Python 3.10+
 - A Telegram bot token and destination chat ID
 
+No Polymarket private key is required for core alerting. The tracker uses public Polymarket APIs for markets/trades.
+
 ## Setup
 ```bash
 python3 -m venv .venv
@@ -29,6 +31,13 @@ Populate `.env` with at least:
 TELEGRAM_BOT_TOKEN=...
 TELEGRAM_CHAT_ID=...
 ```
+
+Optional (price enrichment only):
+```env
+POLYMARKET_PRIVATE_KEY=...
+POLYMARKET_FUNDER_ADDRESS=...
+```
+These are used only for optional CLOB orderbook enrichment (`odds_after` quality). Alerts work without them.
 
 ## Run
 Start the loop:
@@ -87,6 +96,7 @@ Each Telegram alert includes:
 ## Notes
 - `.env` is loaded automatically at startup.
 - Persistent dedupe state is stored in a local JSON file so restarts are replay-safe without extra dependencies.
+- Core detection uses public Gamma/Data APIs. CLOB credentials are optional and only affect orderbook-based price enrichment.
 - This project is alerting infrastructure; validate thresholds on paper trading data before acting on signals.
 - Contributor onboarding docs: `CONTRIBUTING.md`, `MEMORY.md`.
 - CI workflow: `.github/workflows/ci.yml`.
