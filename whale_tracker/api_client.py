@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
 import aiohttp
@@ -279,7 +279,7 @@ class PolymarketAPIClient:
             if ts is None:
                 continue
             try:
-                closed_time = datetime.utcfromtimestamp(int(ts))
+                closed_time = datetime.fromtimestamp(int(ts), timezone.utc).replace(tzinfo=None)
             except Exception:
                 continue
             if closed_time < cutoff:
@@ -388,7 +388,7 @@ class PolymarketAPIClient:
             oldest_ts = page[-1].get("timestamp")
             if oldest_ts is not None:
                 try:
-                    oldest_time = datetime.utcfromtimestamp(int(oldest_ts))
+                    oldest_time = datetime.fromtimestamp(int(oldest_ts), timezone.utc).replace(tzinfo=None)
                     if oldest_time < cutoff:
                         break
                 except Exception:
@@ -402,7 +402,7 @@ class PolymarketAPIClient:
             ts = t.get("timestamp")
             if ts is None:
                 continue
-            trade_time = datetime.utcfromtimestamp(int(ts))
+            trade_time = datetime.fromtimestamp(int(ts), timezone.utc).replace(tzinfo=None)
             if trade_time < cutoff:
                 continue
 
@@ -420,7 +420,15 @@ class PolymarketAPIClient:
             outcome_raw = str(t.get("outcome") or "").strip()
             outcome_lower = outcome_raw.lower()
             if outcome_index is not None:
-                side = "YES" if int(outcome_index) == 0 else "NO"
+                try:
+                    side = "YES" if int(outcome_index) == 0 else "NO"
+                except Exception:
+                    if outcome_lower == "yes":
+                        side = "YES"
+                    elif outcome_lower == "no":
+                        side = "NO"
+                    else:
+                        side = "UNKNOWN"
             elif outcome_lower == "yes":
                 side = "YES"
             elif outcome_lower == "no":
